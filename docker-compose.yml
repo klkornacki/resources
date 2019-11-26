@@ -1,0 +1,84 @@
+version: '2.2'
+
+services:
+
+  postgres:
+    image: postgres
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=${RDBMS_USERNAME}
+      - POSTGRES_PASSWORD=${RDBMS_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgresql:/var/lib/postgresql
+      - postgresql_data:/var/lib/postgresql/data
+
+  postgres2:
+    image: postgres
+    container_name: postgres2
+    environment:
+      - POSTGRES_USER=${RDBMS_USERNAME2}
+      - POSTGRES_PASSWORD=${RDBMS_PASSWORD2}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres2"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgresql2:/var/lib/postgresql
+      - postgresql_data2:/var/lib/postgresql/data
+
+  webapi-service:
+    image: springio/webapi-service
+    container_name: webapi-service
+    healthcheck:
+      test: curl -sSf --max-time 3 http://localhost:8072/ops/health || exit 1
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    ports:
+      - 8070:8070
+      - 8072:8072
+    tmpfs: /tmp
+
+  user-authorization-service:
+    image: springio/user-authorization-service
+    container_name: user-authorization-service
+    environment:
+     - APP_GATEWAY_HOST=${APP_GATEWAY_HOST}
+     - DB_USERNAME=${RDBMS_USERNAME}
+     - DB_PASSWORD=${RDBMS_PASSWORD}
+    healthcheck:
+      test: curl -sSf --max-time 3 http://localhost:8092/ops/health || exit 1
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      postgres:
+        condition: service_healthy
+    tmpfs: /tmp
+
+  user-resource-service:
+    image: springio/user-resource-service
+    container_name: user-resource-service
+    environment:
+     - DB_USERNAME=${RDBMS_USERNAME2}
+     - DB_PASSWORD=${RDBMS_PASSWORD2}
+    healthcheck:
+      test: curl -sSf --max-time 3 http://localhost:8062/ops/health || exit 1
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      postgres2:
+        condition: service_healthy
+    tmpfs: /tmp
+volumes:
+  postgresql:
+  postgresql_data:
+  postgresql2:
+  postgresql_data2:
